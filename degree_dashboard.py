@@ -18,50 +18,84 @@ def load_data():
 
 df = load_data()
     
-st.title("🎓 Australian Degrees Explorer")
-st.markdown("Search, filter and download data on 2026 degrees")
+st.title("Adelaide University Degrees Explorer")
+st.markdown("Search, filter and download data on AU 2026 degrees")
 
 # --- Filter Data ---
 df['Start date'] = df['Start date'].astype(str).str.strip()
 none_option = "-- None --"
 
+# Extract individual campuses
 all_campuses = df['Campus'].dropna().str.split(',').explode().str.strip().unique()
 all_campuses = sorted(all_campuses)
 
-col1, col2 = st.columns(2)
-with col1:
-    degree_name = st.selectbox("🎓 Search a Degree Name", options=[none_option] + sorted(df['Degree Name'].dropna().unique()))
+# Initialise session_state
+if 'reset_triggered' not in st.session_state:
+    st.session_state.reset_triggered = False
 
-with col2:
-    campus = st.selectbox("📍 Select Campus", options=[none_option] + all_campuses)
+for key in ['degree_name', 'campus', 'mode', 'start_date']:
+    if key not in st.session_state:
+        st.session_state[key] = none_option
 
-col3, col4 = st.columns(2)
+with st.sidebar:
+    st.header("Filter Degrees")
 
-with col3:
-    mode = st.selectbox("🧑‍🏫 Select Mode", options=[none_option] + sorted(df['Mode'].dropna().unique()))
+    # Filters using session state
+    st.session_state.degree_name = st.selectbox(
+        "Search a Degree Name",
+        options=[none_option] + sorted(df['Degree Name'].dropna().unique()),
+        index=([none_option] + sorted(df['Degree Name'].dropna().unique())).index(st.session_state.degree_name)
+    )
 
-with col4:
-    start_date = st.selectbox("🗓️ Select Start Date", options=[none_option] + sorted(df['Start date'].dropna().unique()))
+    st.session_state.campus = st.selectbox(
+        "Select Campus",
+        options=[none_option] + all_campuses,
+        index=([none_option] + all_campuses).index(st.session_state.campus)
+    )
 
+    st.session_state.mode = st.selectbox(
+        "Select Mode",
+        options=[none_option] + sorted(df['Mode'].dropna().unique()),
+        index=([none_option] + sorted(df['Mode'].dropna().unique())).index(st.session_state.mode)
+    )
+
+    st.session_state.start_date = st.selectbox(
+        "Select Start Date",
+        options=[none_option] + sorted(df['Start date'].dropna().unique()),
+        index=([none_option] + sorted(df['Start date'].dropna().unique())).index(st.session_state.start_date)
+    )
+
+    # Reset button
+    if st.button("Reset Filters"):
+        for key in ['degree_name', 'campus', 'mode', 'start_date']:
+            st.session_state[key] = none_option
+        st.rerun()
+
+# --- Filter Data ---
 filtered_df = df.copy()
 
-if degree_name != none_option:
-    filtered_df = filtered_df[filtered_df['Degree Name'] == degree_name]
+if st.session_state.degree_name != none_option:
+    filtered_df = filtered_df[filtered_df['Degree Name'] == st.session_state.degree_name]
 
-if campus != none_option:
-    filtered_df = filtered_df[filtered_df['Campus'].str.contains(campus, case=False, na=False)]
-    
-if mode != none_option:
-    filtered_df = filtered_df[filtered_df['Mode'] == mode]
-    
-if start_date != none_option:
-    filtered_df = filtered_df[filtered_df['Start date'] == start_date]
+if st.session_state.campus != none_option:
+    filtered_df = filtered_df[
+        filtered_df['Campus']
+        .astype(str)
+        .str.split(',')
+        .apply(lambda campuses: st.session_state.campus in [c.strip() for c in campuses])
+    ]
+
+if st.session_state.mode != none_option:
+    filtered_df = filtered_df[filtered_df['Mode'] == st.session_state.mode]
+
+if st.session_state.start_date != none_option:
+    filtered_df = filtered_df[filtered_df['Start date'] == st.session_state.start_date]
 
 # --- Sort Options ---
-st.markdown("### Sort Options")
+st.markdown("##### Sort Options")
 col_sort1, col_sort2 = st.columns([2, 1])
 with col_sort1:
-    sort_col = st.selectbox("Sort by column", options=[col for col in df.columns if col != 'Degree URL'])
+    sort_col = st.selectbox("Sort by", options=[col for col in df.columns if col != 'Degree URL'])
 with col_sort2:
     ascending = st.radio("Sort order", ['Ascending', 'Descending'], horizontal=True) == 'Ascending'
 
@@ -79,7 +113,7 @@ filtered_df['Degree Name'] = filtered_df.apply(
 display_df = filtered_df.drop(columns=['Degree URL'])
 
 # --- Display Table ---
-st.markdown(f"### Showing {len(display_df)} Results")
+st.markdown(f"Showing {len(display_df)} Results")
 st.write(display_df.to_html(escape=False, index=False), unsafe_allow_html=True)
 
 # --- Download ---
