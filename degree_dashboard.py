@@ -2,6 +2,7 @@
 import streamlit as st
 import pandas as pd
 import os
+import re
 
 st.set_page_config(page_title="Australian Degrees Explorer", layout="wide")
 
@@ -17,7 +18,7 @@ field_files = {
         "AU_creative_media_communication_degrees_2026.csv": "Creative, Media & Communication",
         "AU_engineering_degrees_2026.csv": "Engineering",
         "AU_health_biomedical-sciences_degrees_2026.csv": "Health & Biomedical Sciences",
-        "AU_law_justice_degrees_2026": "Law & Justice",
+        "AU_law_justice_degrees_2026.csv": "Law & Justice",
         "AU_mathematics_data-science_degrees_2026.csv": "Mathematics & Data Science",
         "AU_medicine_dentistry_oral-health_degrees_2026.csv": "Medicine, Dentistry & Oral Health",
         "AU_music_degrees_2026.csv": "Music",
@@ -66,8 +67,9 @@ def load_data():
         degrees = degrees.merge(subjects, on='Degree Name', how='left')
 
     degrees['Degree Name'] = degrees['Degree Name'].astype(str).str.strip()
-    degrees['Mode'] = degrees['Mode'].astype(str).str.strip()
+    degrees['Mode'] = degrees['Mode'].str.strip().str.title()
     degrees['Campus'] = degrees['Campus'].astype(str).str.strip()
+    degrees['Campus'] = degrees['Campus'].replace(['nan', 'NaN', ''], pd.NA)  # Set those to real NA
     degrees['Start date'] = degrees['Start date'].astype(str).str.strip()
 
     field_rows = []
@@ -75,7 +77,7 @@ def load_data():
         if os.path.exists(file):
             df_field = pd.read_csv(file)
             df_field['Degree Name'] = df_field['Degree Name'].astype(str).str.strip()
-            df_field['Mode'] = df_field['Mode'].astype(str).str.strip()
+            df_field['Mode'] = df_field['Mode'].str.strip().str.title()
 
             for _, row in df_field.iterrows():
                 field_rows.append({
@@ -89,7 +91,7 @@ def load_data():
 
     # Aggregate Fields and Modes so that each degree has one row
     agg_df = degrees.groupby(['Degree Name']).agg({
-        'Field': lambda x: ', '.join(sorted(set(x.dropna()))),
+        'Field': lambda x: ' ; '.join(sorted(set(x.dropna()))),
         'Mode': lambda x: ', '.join(sorted(set(x.dropna()))),
         'Campus': lambda x: ', '.join(sorted(set(x.dropna()))),
         'Start date': 'first',
@@ -102,8 +104,11 @@ def load_data():
         # Add other columns you want to keep here...
     }).reset_index()
 
+    # Add a list version of the field column for better filtering
+    agg_df['Field List'] = agg_df['Field'].apply(lambda x: [f.strip() for f in x.split(';')] if pd.notna(x) else [])
+
     agg_df = agg_df.fillna('')
-    agg_df['Campus'] = agg_df['Campus'].replace('nan', '') # Stupid nan showing up in Campus cells when no value exists.
+    #agg_df['Campus'] = agg_df['Campus'].replace('nan', 'Magill, Mount Gambier, Whyalla') # Stupid nan showing up in certain degrees
     
     return agg_df
 
@@ -188,9 +193,11 @@ if selected_mode != none_option:
 if selected_start_date != none_option:
     filtered_df = filtered_df[filtered_df['Start date'] == selected_start_date]
 
-if st.session_state.field != none_option:
-    filtered_df = filtered_df[filtered_df['Field'].str.contains(st.session_state.field)]
+#if st.session_state.field != none_option:
+ #   filtered_df = filtered_df[filtered_df['Field'].str.contains(st.session_state.field)]
 
+if st.session_state.field != none_option:
+    filtered_df = filtered_df[filtered_df['Field List'].apply(lambda fields: st.session_state.field in fields)]
 
 # --- Sort Options ---
 #st.markdown("##### Sort Options")
