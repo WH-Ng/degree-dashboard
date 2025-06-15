@@ -3,6 +3,63 @@ import streamlit as st
 import pandas as pd
 import os
 import re
+import gspread
+from google.oauth2.service_account import Credentials
+from datetime import datetime
+
+# Path to your Google service account JSON key file
+SERVICE_ACCOUNT_FILE = '/Users/wayne/Personal_Project/streamlit-degree-dashboard-470764b2fe7a.json' 
+
+# Your Google Sheet ID (from the URL of your spreadsheet)
+SPREADSHEET_ID = '1_6ZyxLbQT2CyUdiRV5wLbjv8f8OimORe9ErVPxIraXQ' # Replace with your sheet ID
+
+SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
+
+try:
+    creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+    client = gspread.authorize(creds)
+    sheet = client.open_by_key(SPREADSHEET_ID).sheet1
+    print("Google Sheets connection successful!")
+except Exception as e:
+    sheet = None
+    print(f"Google Sheets authorization failed: {e}")
+
+HEADER = [
+    "Timestamp", "Selected Field", "Selected Degree", "Selected Campus", 
+    "Selected Mode", "Selected Start Date", "Sort Column", "Ascending", "Number of Results"
+]
+
+def ensure_header(sheet):
+    try:
+        first_row = sheet.row_values(1)
+        if first_row != HEADER:
+            sheet.delete_rows(1)  # clear first row if different
+            sheet.insert_row(HEADER, 1)
+    except Exception as e:
+        print(f"Error ensuring header row: {e}")
+
+def log_filter_usage(log_data: dict):
+    if sheet is None:
+        print("Skipping logging: No Google Sheet connection.")
+        return
+
+    try:
+        ensure_header(sheet)
+
+        values = [
+            log_data.get("timestamp", ""),
+            log_data.get("selected_field", ""),
+            log_data.get("selected_degree", ""),
+            log_data.get("selected_campus", ""),
+            log_data.get("selected_mode", ""),
+            log_data.get("selected_start_date", ""),
+            log_data.get("sort_column", ""),
+            log_data.get("ascending", ""),
+            str(log_data.get("num_results", ""))
+        ]
+        sheet.append_row(values)
+    except Exception as e:
+        print(f"Failed to log filter usage: {e}")
 
 st.set_page_config(page_title="Australian Degrees Explorer", layout="wide")
 
@@ -55,6 +112,14 @@ CLEAN_FIELD_LIST = [
         "Teaching & Education",
         "Tourism, Sport & Events"
     ]
+
+def remove_html_tags(text):
+    if isinstance(text, str):
+        # Remove all HTML tags
+        clean_text = re.sub(r'<.*?>', '', text)
+        return clean_text
+    return text
+
 
 # Load data
 @st.cache_data
@@ -147,9 +212,6 @@ with st.sidebar:
     # Filters using session state
 
     selected_field = st.selectbox("Select Field", options=[none_option] + CLEAN_FIELD_LIST, key='field')
-
-    
-    selected_degree = st.selectbox("Search a Degree Name", options=[none_option] + sorted(df['Degree Name'].dropna().unique()), key='degree_name')
     
     all_campuses = df['Campus'].dropna().str.split(',').explode().str.strip().unique()
     all_campuses = sorted(all_campuses)
@@ -165,8 +227,11 @@ with st.sidebar:
     
     selected_start_date = st.selectbox("Select Start Date", options=[none_option] + sorted(df['Start date'].dropna().unique()), key='start_date')
 
+selected_degree = st.selectbox("Search a Degree Name", options=[none_option] + sorted(df['Degree Name'].dropna().unique()), key='degree_name')
+
 # --- Filter Data ---
 filtered_df = df.copy()
+filtered_df['Guaranteed ATAR score'] = pd.to_numeric(filtered_df['Guaranteed ATAR score'], errors='coerce')
 
 if selected_degree != none_option:
     filtered_df = filtered_df[filtered_df['Degree Name'] == selected_degree]
@@ -207,25 +272,76 @@ with col_sort1:
 with col_sort2:
     ascending = st.radio("Sort order", ['Ascending', 'Descending'], horizontal=True) == 'Ascending'
 
-filtered_df = filtered_df.sort_values(by=sort_col, ascending=ascending)
 
-# --- Make Degree Name clickable ---
-def make_clickable(name, url):
-    return f'<a href="{url}" target="_blank">{name}</a>'
 
-filtered_df['Degree Name'] = filtered_df.apply(
-    lambda row: make_clickable(row['Degree Name'], row['Degree URL']), axis=1
-)
+if filtered_df.empty:
+    st.warning("No results found for the selected filters.")
+else:
+    filtered_df = filtered_df.sort_values(by=sort_col, ascending=ascending)
 
-# --- Remove URL column from display ---
-display_df = filtered_df.drop(columns=['Degree URL'])
+    # --- Make Degree Name clickable for display ---
+    def make_clickable(name, url):
+        return f'<a href="{url}" target="_blank">{name}</a>'
 
-# --- Display Table ---
-st.markdown(f"Showing {len(display_df)} Results")
-st.write(display_df.to_html(escape=False, index=False), unsafe_allow_html=True)
+    display_df = filtered_df.copy()
+    display_df['Degree Name'] = display_df.apply(
+        lambda row: make_clickable(row['Degree Name'], row['Degree URL']), axis=1
+    )
+    display_df = display_df.drop(columns=['Degree URL'])
 
-# --- Download ---
-with st.sidebar:
-    st.markdown("---")  # a separator line
-    csv = filtered_df.to_csv(index=False).encode('utf-8')
-    st.download_button("Download CSV", csv, "filtered_degrees.csv", "text/csv")
+    st.markdown(f"Showing {len(display_df)} Results")
+    st.write(display_df.to_html(escape=False, index=False), unsafe_allow_html=True)
+
+    # --- Download ---
+    with st.sidebar:
+        st.markdown("---")
+    
+        # Your CSV export code here
+        csv_export_df = filtered_df.copy()
+        csv_export_df['Degree Name'] = csv_export_df['Degree Name'].apply(remove_html_tags)
+        csv_export_df = csv_export_df.drop(columns=['Field List'], errors='ignore')
+    
+        csv = csv_export_df.to_csv(index=False).encode('utf-8')
+    
+        download_clicked = st.download_button("Download CSV", csv, "filtered_degrees.csv", "text/csv")
+    
+        if download_clicked:
+            log_data = {
+                "timestamp": datetime.now().isoformat(),
+                "selected_field": st.session_state.get('field', '-- None --'),
+                "selected_degree": st.session_state.get('degree_name', '-- None --'),
+                "selected_campus": st.session_state.get('campus', '-- None --'),
+                "selected_mode": st.session_state.get('mode', '-- None --'),
+                "selected_start_date": st.session_state.get('start_date', '-- None --'),
+                "sort_column": sort_col,
+                "ascending": ascending,
+                "num_results": len(filtered_df),
+            }
+            log_filter_usage(log_data)
+
+with st.sidebar.expander("Feedback", expanded=False):
+    st.markdown("Help us improve the dashboard!")
+
+    feedback_rating = st.slider("How useful is this dashboard to you?", 1, 5, 3)
+    feedback_text = st.text_area("Any suggestions, bugs, or ideas? (Optional)")
+
+    if st.button("Submit Feedback"):
+        from datetime import datetime
+
+        feedback_log = {
+            "timestamp": datetime.now().isoformat(),
+            "rating": feedback_rating,
+            "feedback": feedback_text
+        }
+
+        # Save to Google Sheet if available
+        if client:
+            try:
+                feedback_sheet = client.open_by_key(SPREADSHEET_ID).worksheet("User Feedback")
+                feedback_sheet.append_row([feedback_log["timestamp"], feedback_log["rating"], feedback_log["feedback"]])
+                st.success("Thanks for your feedback!")
+            except Exception as e:
+                st.error("Failed to submit feedback.")
+                print(f"Feedback logging error: {e}")
+        else:
+            st.error("Google Sheet connection not active.")
