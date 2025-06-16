@@ -7,13 +7,16 @@ import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 
-# Path to your Google service account JSON key file
-SERVICE_ACCOUNT_FILE = '/Users/wayne/Personal_Project/streamlit-degree-dashboard-a41ee170648d.json' 
-
-# Your Google Sheet ID (from the URL of your spreadsheet)
-SPREADSHEET_ID = '1_6ZyxLbQT2CyUdiRV5wLbjv8f8OimORe9ErVPxIraXQ' # Replace with your sheet ID
-
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
+
+# Authenticate with Google using Streamlit Secrets
+creds = Credentials.from_service_account_info(st.secrets["gcp"])
+client = gspread.authorize(creds)
+
+# Open your Google Sheet
+SPREADSHEET_ID = '1_6ZyxLbQT2CyUdiRV5wLbjv8f8OimORe9ErVPxIraXQ'  # Keep just the ID, not the whole URL
+sheet = client.open_by_key(SPREADSHEET_ID).sheet1
+
 
 try:
     creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
