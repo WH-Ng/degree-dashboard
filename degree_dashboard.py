@@ -9,23 +9,30 @@ from datetime import datetime
 
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
-# Authenticate with Google using Streamlit Secrets
-creds = Credentials.from_service_account_info(st.secrets["gcp"])
+Authenticate with Google using Streamlit Secrets
+creds = Credentials.from_service_account_info(st.secrets["gcp"]) 
 client = gspread.authorize(creds)
 
-# Open your Google Sheet
-SPREADSHEET_ID = '1_6ZyxLbQT2CyUdiRV5wLbjv8f8OimORe9ErVPxIraXQ'  # Keep just the ID, not the whole URL
+Open your Google Sheet
+SPREADSHEET_ID = '1_6ZyxLbQT2CyUdiRV5wLbjv8f8OimORe9ErVPxIraXQ'  
 sheet = client.open_by_key(SPREADSHEET_ID).sheet1
 
+# _________________________________________________
 
-try:
-    creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
-    client = gspread.authorize(creds)
-    sheet = client.open_by_key(SPREADSHEET_ID).sheet1
-    print("Google Sheets connection successful!")
-except Exception as e:
-    sheet = None
-    print(f"Google Sheets authorization failed: {e}")
+#SERVICE_ACCOUNT_FILE = '/Users/wayne/Personal_Project/streamlit-degree-dashboard-6049adf3a7b1.json'
+#SPREADSHEET_ID = '1_6ZyxLbQT2CyUdiRV5wLbjv8f8OimORe9ErVPxIraXQ'  # Just the ID, not full URL
+
+#try:
+ #   creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+ #   client = gspread.authorize(creds)
+ #   sheet = client.open_by_key(SPREADSHEET_ID).sheet1
+ #   print("Google Sheets connection successful!")
+ #   sheet.append_row(["Test log", "Local test", "Success"])
+  #  print("Row appended successfully!")
+#except Exception as e:
+ #   print(f"Error: {e}")
+
+# ___________________________________________________
 
 HEADER = [
     "Timestamp", "Selected Field", "Selected Degree", "Selected Campus", 
