@@ -8,7 +8,7 @@ from google.oauth2.service_account import Credentials
 from datetime import datetime
 
 # Path to your Google service account JSON key file
-SERVICE_ACCOUNT_FILE = '/Users/wayne/Personal_Project/streamlit-degree-dashboard-470764b2fe7a.json' 
+SERVICE_ACCOUNT_FILE = '/Users/wayne/Personal_Project/streamlit-degree-dashboard-a41ee170648d.json' 
 
 # Your Google Sheet ID (from the URL of your spreadsheet)
 SPREADSHEET_ID = '1_6ZyxLbQT2CyUdiRV5wLbjv8f8OimORe9ErVPxIraXQ' # Replace with your sheet ID
