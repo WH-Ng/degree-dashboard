@@ -7,14 +7,9 @@ import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 
-SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
-
-#Authenticate with Google using Streamlit Secrets
-creds = Credentials.from_service_account_info(st.secrets["gcp"]) 
+scope = ["https://www.googleapis.com/auth/spreadsheets"]
+creds = Credentials.from_service_account_info(st.secrets["gcp"], scopes=scope)
 client = gspread.authorize(creds)
-
-#Open your Google Sheet
-SPREADSHEET_ID = '1_6ZyxLbQT2CyUdiRV5wLbjv8f8OimORe9ErVPxIraXQ'  
 sheet = client.open_by_key(SPREADSHEET_ID).sheet1
 
 # _________________________________________________
