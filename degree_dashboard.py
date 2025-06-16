@@ -10,6 +10,7 @@ from datetime import datetime
 scope = ["https://www.googleapis.com/auth/spreadsheets"]
 creds = Credentials.from_service_account_info(st.secrets["gcp"], scopes=scope)
 client = gspread.authorize(creds)
+SPREADSHEET_ID = '1_6ZyxLbQT2CyUdiRV5wLbjv8f8OimORe9ErVPxIraXQ'  
 sheet = client.open_by_key(SPREADSHEET_ID).sheet1
 
 # _________________________________________________
